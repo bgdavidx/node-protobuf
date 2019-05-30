@@ -21,6 +21,9 @@ NativeProtobuf::NativeProtobuf(FileDescriptorSet *descriptors,
 }
 
 void NativeProtobuf::Init(Local<Object> exports) {
+  Nan::HandleScope scope;
+
+  Isolate* isolate = Isolate::GetCurrent();
 
   // constructor
   Local<FunctionTemplate> tpl = Nan::New<FunctionTemplate>(New);
@@ -35,13 +38,15 @@ void NativeProtobuf::Init(Local<Object> exports) {
   Nan::SetPrototypeMethod(tpl, "serialize", NativeProtobuf::Serialize);
   Nan::SetPrototypeMethod(tpl, "info", NativeProtobuf::Info);
 
-  constructor.Reset(tpl->GetFunction());
-  exports->Set(Nan::New<String>("native").ToLocalChecked(), tpl->GetFunction());
+  constructor.Reset(tpl->GetFunction(isolate->GetCurrentContext()).ToLocalChecked());
+  exports->Set(Nan::New<String>("native").ToLocalChecked(), tpl->GetFunction(isolate->GetCurrentContext()).ToLocalChecked());
 }
 
 NAN_METHOD(NativeProtobuf::New) {
+  Nan::HandleScope scope;
 
-  Local<Object> buffer_obj = info[0]->ToObject();
+  Isolate* isolate = Isolate::GetCurrent();
+  Local<Object> buffer_obj = info[0]->ToObject(isolate);
   char *buffer_data = Buffer::Data(buffer_obj);
   size_t buffer_length = Buffer::Length(buffer_obj);
 
@@ -52,7 +57,7 @@ NAN_METHOD(NativeProtobuf::New) {
     return;
   }
 
-  bool preserve_int64 = info[1]->BooleanValue();
+  bool preserve_int64 = info[1]->BooleanValue(isolate);
 
   NativeProtobuf *proto = new NativeProtobuf(&descriptors, preserve_int64);
   proto->Wrap(info.This());
@@ -61,13 +66,15 @@ NAN_METHOD(NativeProtobuf::New) {
 }
 
 NAN_METHOD(NativeProtobuf::Serialize) {
+  Nan::HandleScope scope;
+  
   auto isolate = info.GetIsolate();
 
   NativeProtobuf *self = Nan::ObjectWrap::Unwrap<NativeProtobuf>(info.This());
 
   // get object to serialize and name of schema
-  Local<Object> subj = info[0]->ToObject();
-  String::Utf8Value schemaName(isolate, info[1]->ToString());
+  Local<Object> subj = info[0]->ToObject(isolate);
+  Nan::Utf8String schemaName(info[1]->ToString(isolate));
   std::string schema_name = std::string(*schemaName);
 
   // create a message based on schema
@@ -104,15 +111,17 @@ NAN_METHOD(NativeProtobuf::Serialize) {
 }
 
 NAN_METHOD(NativeProtobuf::Parse) {
+  Nan::HandleScope scope;
+
   auto isolate = info.GetIsolate();
 
   NativeProtobuf *self = Nan::ObjectWrap::Unwrap<NativeProtobuf>(info.This());
 
-  Local<Object> buffer_obj = info[0]->ToObject();
+  Local<Object> buffer_obj = info[0]->ToObject(isolate);
   char *buffer_data = Buffer::Data(buffer_obj);
   size_t buffer_length = Buffer::Length(buffer_obj);
 
-  String::Utf8Value schemaName(isolate, info[1]->ToString());
+  Nan::Utf8String schemaName(info[1]->ToString(isolate));
   std::string schema_name = std::string(*schemaName);
 
   // create a message based on schema
@@ -127,8 +136,8 @@ NAN_METHOD(NativeProtobuf::Parse) {
   google::protobuf::io::ArrayInputStream array_stream(buffer_data,
                                                       buffer_length);
   google::protobuf::io::CodedInputStream coded_stream(&array_stream);
-  size_t max = info[2]->Uint32Value();
-  size_t warn = info[3]->Uint32Value();
+  size_t max = static_cast<size_t>(Nan::To<int32_t>(info[2]).FromMaybe(0));
+  size_t warn = static_cast<size_t>(Nan::To<int32_t>(info[3]).FromMaybe(0));
   if (max) {
     coded_stream.SetTotalBytesLimit(max, warn ? warn : max);
   }
@@ -142,7 +151,7 @@ NAN_METHOD(NativeProtobuf::Parse) {
   if (info.Length() < 5) {
     use_typed_array = true;
   } else {
-    use_typed_array = info[4]->BooleanValue();
+    use_typed_array = info[4]->BooleanValue(isolate);
   }
 
   if (parseResult) {
@@ -159,15 +168,17 @@ NAN_METHOD(NativeProtobuf::Parse) {
 }
 
 NAN_METHOD(NativeProtobuf::ParseWithUnknown) {
+  Nan::HandleScope scope;
+
   auto isolate = info.GetIsolate();
 
   NativeProtobuf *self = Nan::ObjectWrap::Unwrap<NativeProtobuf>(info.This());
 
-  Local<Object> buffer_obj = info[0]->ToObject();
+  Local<Object> buffer_obj = info[0]->ToObject(isolate);
   char *buffer_data = Buffer::Data(buffer_obj);
   size_t buffer_length = Buffer::Length(buffer_obj);
 
-  String::Utf8Value schemaName(isolate, info[1]->ToString());
+  Nan::Utf8String schemaName(info[1]->ToString(isolate));
   std::string schema_name = std::string(*schemaName);
 
   // create a message based on schema
@@ -183,8 +194,10 @@ NAN_METHOD(NativeProtobuf::ParseWithUnknown) {
   google::protobuf::io::ArrayInputStream array_stream(buffer_data,
                                                       buffer_length);
   google::protobuf::io::CodedInputStream coded_stream(&array_stream);
-  size_t max = info[2]->Uint32Value();
-  size_t warn = info[3]->Uint32Value();
+
+  size_t max = static_cast<size_t>(Nan::To<int32_t>(info[2]).FromMaybe(0));
+  size_t warn = static_cast<size_t>(Nan::To<int32_t>(info[3]).FromMaybe(0));
+
   if (max) {
     coded_stream.SetTotalBytesLimit(max, warn ? warn : max);
   }
@@ -198,7 +211,7 @@ NAN_METHOD(NativeProtobuf::ParseWithUnknown) {
   if (info.Length() < 5) {
     use_typed_array = true;
   } else {
-    use_typed_array = info[4]->BooleanValue();
+    use_typed_array = info[4]->BooleanValue(isolate);
   }
 
   if (parseResult) {
@@ -214,6 +227,7 @@ NAN_METHOD(NativeProtobuf::ParseWithUnknown) {
 }
 
 NAN_METHOD(NativeProtobuf::Info) {
+  Nan::HandleScope scope;
 
   NativeProtobuf *self = Nan::ObjectWrap::Unwrap<NativeProtobuf>(info.This());
   Local<Array> array = Nan::New<Array>();
