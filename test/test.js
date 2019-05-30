@@ -5,6 +5,14 @@ var p = require("../protobuf")
 var pb = new p(fs.readFileSync(__dirname + "/test.desc"))
 var pbUnknown = new p(fs.readFileSync(__dirname + "/testUnknown.desc"))
 
+function deepEqualLoose(a1, a2) {
+  assert.equal(a1.length, a2.length)
+
+  for (let i = 0; i < a1.length; i++) {
+    assert.equal(a1[i], a2[i])
+  }
+}
+
 describe("Basic", function() {
 	var obj = {
 		"name": "test",
@@ -136,7 +144,7 @@ describe("Basic", function() {
 			var buffer = pb.serialize(obj, "tk.tewi.Test")
 			var parsed = pb.parse(buffer, "tk.tewi.Test", null, null, null, false);
 
-			assert.deepEqual(obj.r, parsed.r)
+			deepEqualLoose(obj.r, parsed.r)
 			assert.notEqual(parsed.r instanceof Int32Array, true,
 				'Should not be an Int32Array');
 		})
@@ -262,7 +270,7 @@ describe("Basic", function() {
 			var buffer = pb.serialize(obj, "tk.tewi.Test")
 			var parsed = pb.parseWithUnknown(buffer, "tk.tewi.Test", null, null, null, false);
 
-			assert.deepEqual(obj.r, parsed.r)
+		  deepEqualLoose(obj.r, parsed.r)
 			assert.notEqual(parsed.r instanceof Int32Array, true,
 				'Should not be an Int32Array');
 		})
